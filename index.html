@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>نظام إدارة قطع الكمبيوتر — طباعة سجل التركيبات فقط</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    body{background:gray;font-family:'Cairo',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;}
+    .card{border:none;border-radius:18px;box-shadow:0 6px 20px rgba(0,0,0,.06)}
+    .card h5{font-weight:800}
+    .pill{display:inline-block;padding:.25rem .6rem;border-radius:999px;font-size:.8rem}
+    .pill-stock{background:#e9f7ef;color:#1e7e34}
+    .pill-used{background:#fdecea;color:#b02a37}
+    .thumb{width:56px;height:56px;object-fit:cover;border-radius:10px;border:1px solid #eee}
+    .req::after{content:" *";color:#dc3545}
+    .legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-inline-end:6px;vertical-align:middle}
+    .sticky-actions{position:sticky;top:0;z-index:10;background:linear-gradient(#f6f7fb,#f6f7fbcc)}
+    .table thead th{white-space:nowrap}
+    .table tbody td{vertical-align:middle}
+    .divider{height:1px;background:linear-gradient(90deg,transparent,#ddd,transparent);margin:1rem 0}
+    .searchbox{border-radius:12px}
+    .qty-box{display:inline-flex;align-items:center;gap:.35rem}
+    .qty-val{min-width:2.5rem;display:inline-block;text-align:center}
+    .status-badge{font-size:.75rem}
+
+    /* ✅ الطباعة: سجل التركيبات فقط */
+    @media print {
+      body * { visibility: hidden !important; }
+      #txSection, #txSection * { visibility: visible !important; }
+      #txSection { position: absolute !important; top: 0; left: 0; width: 100% !important; }
+      #txSection.collapse { display: block !important; }
+      body{background:#fff !important;}
+      .card{box-shadow:none !important;border:1px solid #ccc !important;}
+      .table{page-break-inside:auto}
+      tr{page-break-inside:avoid;page-break-after:auto}
+    }
+  </style>
+</head>
+<body>
+<div class="container py-4">
+
+  <!-- شريط الأدوات العلوي -->
+  <div class="sticky-actions pb-2 mb-3">
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+      <button id="btnSaveNow" class="btn btn-secondary">
+        <i class="bi bi-save2 me-1"></i> حفظ البيانات
+      </button>
+
+      <!-- زر الطباعة الأزرق -->
+      <button id="btnPrint" class="btn btn-primary">
+        <i class="bi bi-printer me-1"></i> طباعة سجل التركيبات
+      </button>
+
+      <div class="vr mx-1"></div>
+      <button id="toggleStockBtn" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#stockSection" aria-expanded="true">
+        <i class="bi bi-eye-slash me-1"></i> إخفاء المخزون الحالي
+      </button>
+      <button id="toggleTxBtn" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#txSection" aria-expanded="true">
+        <i class="bi bi-eye-slash me-1"></i> إخفاء سجل التركيبات
+      </button>
+
+       <a href="scrapped.html" class="btn btn-warning">
+      <i class="bi bi-exclamation-triangle me-1"></i> القطع والأجهزة المسكّرة
+    </a>
+
+      
+    </div>
+  </div>
+
+  <!-- عنوان -->
+  <div class="card p-3 text-center mb-4">
+    <h4 class="fw-bold text-primary mb-0">📦 نظام إدارة قطع الكمبيوتر</h4>
+    <p class="text-muted mb-0">تسجيل المخزون وتركيب القطع على أجهزة الموظفين</p>
+  </div>
+
+  <div class="row g-4">
+    <!-- إضافة قطعة للمخزون -->
+    <div class="col-lg-4">
+      <div class="card p-3">
+        <h5 class="mb-2">إضافة قطعة للمخزون</h5>
+        <div class="small text-muted mb-3">السيريال اختياري، والصورة اختيارية. يمكنك تحديد الكمية مباشرة.</div>
+        <form id="formAddPart" class="needs-validation" novalidate>
+          <div class="mb-2">
+            <label class="form-label req">نوع القطعة</label>
+            <select class="form-select" id="partType" required>
+              <option value="" selected disabled>اختر النوع</option>
+              <option value="فلاش">فلاش USB</option>
+              <option value="رام">رام RAM</option>
+              <option value="هارد">هارد HDD</option>
+              <option value="SSD">SSD</option>
+              <option value="كرت شاشة">كرت شاشة GPU</option>
+              <option value="بور سبلاي">مزود طاقة PSU</option>
+              <option value="لوحة أم">لوحة أم Motherboard</option>
+              <option value="معالج">معالج CPU</option>
+              <option value="كابل">كابل</option>
+              <option value="أخرى">أخرى</option>
+            </select>
+            <div class="invalid-feedback">اختر نوع القطعة.</div>
+          </div>
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label">الماركة</label>
+              <input class="form-control" id="brand" placeholder="مثال: Kingston">
+            </div>
+            <div class="col-6">
+              <label class="form-label">السعة/الموديل</label>
+              <input class="form-control" id="model" placeholder="مثال: 16GB / 1TB">
+            </div>
+          </div>
+          <div class="row g-2 mt-0">
+            <div class="col-6">
+              <label class="form-label">السيريال (اختياري)</label>
+              <input class="form-control" id="serial" placeholder="SN (اختياري)">
+            </div>
+            <div class="col-6">
+              <label class="form-label req">الكمية</label>
+              <input type="number" min="1" step="1" value="1" class="form-control" id="qty" required>
+              <div class="invalid-feedback">أدخل كمية صحيحة (1+).</div>
+            </div>
+          </div>
+          <div class="mt-2">
+            <label class="form-label">ملاحظات</label>
+            <input class="form-control" id="notes" placeholder="تفاصيل إضافية">
+          </div>
+
+          <!-- صورة اختيارية -->
+          <div class="mt-3">
+            <label class="form-label">صورة حقيقية للقطعة (اختياري)</label>
+            <input type="file" class="form-control" id="photo" accept="image/*">
+            <div class="mt-2 d-flex align-items-center gap-2">
+              <img id="photoPreview" class="thumb d-none" alt="preview">
+              <span class="text-muted small">اختياري: يمكنك رفع صورة.</span>
+            </div>
+          </div>
+
+          <div class="d-grid mt-3">
+            <button class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i> إضافة للمخزون</button>
+          </div>
+        </form>
+        <div class="divider"></div>
+        <div class="d-flex align-items-center gap-3">
+          <span><span class="legend-dot" style="background:#dc3545"></span> فلاش</span>
+          <span><span class="legend-dot" style="background:#0d6efd"></span> رام</span>
+          <span><span class="legend-dot" style="background:#198754"></span> هارد</span>
+          <span><span class="legend-dot" style="background:#6f42c1"></span> SSD</span>
+          <span><span class="legend-dot" style="background:#fd7e14"></span> كرت شاشة</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- تركيب قطع على جهاز موظف -->
+    <div class="col-lg-8">
+      <div class="card p-3">
+        <h5 class="mb-2">تركيب قطع عند دخول جهاز الموظف</h5>
+        <div class="small text-muted mb-3">التركيب يخصم 1 من الكمية للقطعة المختارة.</div>
+
+        <form id="formInstall" class="needs-validation" novalidate>
+          <div class="row g-2">
+            <div class="col-md-3">
+              <label class="form-label req">القطاع</label>
+              <input class="form-control" id="sector" required placeholder="اسم القطاع">
+              <div class="invalid-feedback">أدخل القطاع.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label req">القسم</label>
+              <input class="form-control" id="department" required placeholder="اسم القسم">
+              <div class="invalid-feedback">أدخل القسم.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label req">الدور</label>
+              <input class="form-control" id="floor" required placeholder="مثال: الدور 3">
+              <div class="invalid-feedback">أدخل الدور.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label req">اسم الموظف</label>
+              <input class="form-control" id="employee" required placeholder="اسم الموظف">
+              <div class="invalid-feedback">أدخل اسم الموظف.</div>
+            </div>
+          </div>
+
+          <div class="row g-2 mt-1">
+            <div class="col-md-3">
+              <label class="form-label req">رقم الجهاز</label>
+              <input class="form-control" id="deviceNo" required placeholder="Asset/Tag No.">
+              <div class="invalid-feedback">أدخل رقم الجهاز.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label req">نوع الجهاز</label>
+              <select class="form-select" id="deviceType" required>
+                <option value="" disabled selected>اختر النوع</option>
+                <option>Desktop</option><option>Laptop</option><option>All-in-One</option><option>Printer</option><option>POS</option><option>Other</option>
+              </select>
+              <div class="invalid-feedback">اختر نوع الجهاز.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label req">اسم الفني</label>
+              <input class="form-control" id="technician" required placeholder="اسم الفني">
+              <div class="invalid-feedback">أدخل اسم الفني.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">تاريخ</label>
+              <input type="date" class="form-control" id="date">
+            </div>
+          </div>
+
+          <div class="row g-2 mt-2">
+            <div class="col-md-4">
+              <label class="form-label req">نوع القطعة المطلوب تركيبها</label>
+              <select class="form-select" id="installType" required>
+                <option value="" disabled selected>اختر النوع</option>
+                <option value="فلاش">فلاش USB</option>
+                <option value="رام">رام RAM</option>
+                <option value="هارد">هارد HDD</option>
+                <option value="SSD">SSD</option>
+                <option value="كرت شاشة">كرت شاشة GPU</option>
+                <option value="بور سبلاي">مزود طاقة PSU</option>
+                <option value="لوحة أم">لوحة أم Motherboard</option>
+                <option value="معالج">معالج CPU</option>
+                <option value="كابل">كابل</option>
+                <option value="أخرى">أخرى</option>
+              </select>
+              <div class="invalid-feedback">اختر النوع.</div>
+            </div>
+            <div class="col-md-8">
+              <label class="form-label req">اختر القطعة من المخزون (حسب النوع)</label>
+              <select class="form-select" id="installPartSelect" required>
+                <option value="" disabled selected>— اختر قطعة متاحة —</option>
+              </select>
+              <div class="invalid-feedback">اختر قطعة.</div>
+            </div>
+          </div>
+
+          <div class="d-grid mt-3">
+            <button class="btn btn-dark"><i class="bi bi-cpu me-1"></i> تركيب القطعة على الجهاز</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- المخزون الحالي -->
+    <div class="col-12">
+      <div class="collapse show" id="stockSection">
+        <div class="card p-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">المخزون الحالي</h5>
+            <div class="input-group w-auto">
+              <span class="input-group-text bg-white border-0"><i class="bi bi-search"></i></span>
+              <input id="stockSearch" class="form-control searchbox" placeholder="ابحث في المخزون (نوع/ماركة/سيريال/ملاحظات)">
+            </div>
+          </div>
+          <div class="table-responsive mt-3">
+            <table class="table align-middle" id="tblStock">
+              <thead class="table-light">
+                <tr>
+                  <th>الصورة</th><th>النوع</th><th>الماركة</th><th>السعة/الموديل</th>
+                  <th>السيريال</th><th>الكمية</th><th>مركّب</th><th>الحالة</th><th>إزالة</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- سجل التركيبات -->
+    <div class="col-12">
+      <div class="collapse show" id="txSection">
+        <div class="card p-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">سجل التركيبات</h5>
+            <div class="input-group w-auto">
+              <span class="input-group-text bg-white border-0"><i class="bi bi-search"></i></span>
+              <input id="txSearch" class="form-control searchbox" placeholder="بحث في السجل (اسم/قسم/رقم/نوع/سيريال/فني)">
+            </div>
+          </div>
+          <div class="table-responsive mt-3">
+            <table class="table align-middle" id="tblTx">
+              <thead class="table-light">
+              <tr>
+                <th>التاريخ</th><th>الموظف</th><th>القطاع</th><th>القسم</th><th>الدور</th>
+                <th>رقم الجهاز</th><th>نوع الجهاز</th><th>الفني</th><th>نوع القطعة</th><th>السيريال</th><th>تفاصيل</th>
+              </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- الرسوم البيانية -->
+    <div class="col-lg-6">
+      <div class="card p-3">
+        <h5 class="mb-0">توزيع المخزون حسب النوع (بالكمية)</h5>
+        <div class="small text-muted mb-2">ألوان: فلاش=أحمر، رام=أزرق، هارد=أخضر، SSD=بنفسجي، كرت شاشة=برتقالي.</div>
+        <canvas id="chartStock" height="190"></canvas>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card p-3">
+        <h5 class="mb-0">الاستهلاك (مركّب) حسب النوع</h5>
+        <canvas id="chartUsed" height="190"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast حفظ البيانات -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:1080">
+  <div id="saveToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body">✅ تم حفظ البيانات محليًا.</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap + Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script>
+/* ===== مفاتيح التخزين ===== */
+const LS_KEY = 'pc_parts_inventory_qty_v2_serial_optional';
+const LS_TX  = 'pc_parts_transactions_v1';
+const LS_UI  = 'pc_parts_ui_v1';
+
+/* ===== ألوان الأصناف ===== */
+const COLORS = {
+  'فلاش':'#dc3545','رام':'#0d6efd','هارد':'#198754','SSD':'#6f42c1','كرت شاشة':'#fd7e14',
+  'بور سبلاي':'#20c997','لوحة أم':'#6c757d','معالج':'#6610f2','كابل':'#0dcaf0','أخرى':'#adb5bd'
+};
+
+/* ===== بيانات ===== */
+let stock = JSON.parse(localStorage.getItem(LS_KEY) || '[]');  // [{id,type,brand,model,serial?,notes,photo,qty,qty_installed}]
+let txLog = JSON.parse(localStorage.getItem(LS_TX)  || '[]');  // [{...}]
+let uiState = JSON.parse(localStorage.getItem(LS_UI) || '{"stockVisible":true,"txVisible":true}');
+
+function saveAll(){ localStorage.setItem(LS_KEY, JSON.stringify(stock)); localStorage.setItem(LS_TX, JSON.stringify(txLog)); }
+function saveUI(){ localStorage.setItem(LS_UI, JSON.stringify(uiState)); }
+
+/* ===== أدوات ===== */
+function uid(){ return 'id_' + Math.random().toString(36).slice(2,10); }
+function fileToDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); }); }
+function formatDateISO(d){ const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }
+
+/* ===== DOM ===== */
+const tblStockBody = document.querySelector('#tblStock tbody');
+const tblTxBody    = document.querySelector('#tblTx tbody');
+const installType  = document.getElementById('installType');
+const installPartSelect = document.getElementById('installPartSelect');
+
+/* ===== عرض الجداول ===== */
+function renderStock(filter=''){
+  const q = filter.trim().toLowerCase();
+  tblStockBody.innerHTML='';
+  stock.forEach(item=>{
+    const hay = [item.type,item.brand,item.model,item.serial||'',item.notes].join(' ').toLowerCase();
+    if(q && !hay.includes(q)) return;
+    const status = item.qty>0 ? '<span class="pill pill-stock status-badge">متاح</span>' : '<span class="pill pill-used status-badge">نفدت</span>';
+    const serialTxt = item.serial && item.serial.trim() ? item.serial : '—';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${item.photo?`<img src="${item.photo}" class="thumb" alt="">`:'—'}</td>
+      <td>${item.type||''}</td>
+      <td>${item.brand||''}</td>
+      <td>${item.model||''}</td>
+      <td><code>${serialTxt}</code></td>
+      <td>
+        <div class="qty-box">
+          <button class="btn btn-sm btn-outline-secondary" data-action="dec" data-id="${item.id}" title="نقص (−)"><i class="bi bi-dash"></i></button>
+          <span class="qty-val">${item.qty||0}</span>
+          <button class="btn btn-sm btn-outline-secondary" data-action="inc" data-id="${item.id}" title="زيادة (+)"><i class="bi bi-plus"></i></button>
+        </div>
+      </td>
+      <td>${item.qty_installed||0}</td>
+      <td>${status}</td>
+      <td><button class="btn btn-sm btn-outline-danger" title="حذف" data-action="del" data-id="${item.id}"><i class="bi bi-x-lg"></i></button></td>
+    `;
+    tblStockBody.appendChild(tr);
+  });
+}
+
+function renderTx(filter=''){
+  const q = filter.trim().toLowerCase();
+  tblTxBody.innerHTML='';
+  txLog.forEach(t=>{
+    const hay = [t.date,t.employee,t.sector,t.department,t.floor,t.deviceNo,t.deviceType,t.technician,t.partType,t.partSerial||'',t.details].join(' ').toLowerCase();
+    if(q && !hay.includes(q)) return;
+    const serialTxt = t.partSerial && t.partSerial.trim() ? t.partSerial : '—';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${t.date}</td><td>${t.employee}</td><td>${t.sector}</td><td>${t.department}</td><td>${t.floor}</td>
+      <td>${t.deviceNo}</td><td>${t.deviceType}</td><td>${t.technician}</td>
+      <td>${t.partType}</td><td><code>${serialTxt}</code></td><td>${t.details||''}</td>
+    `;
+    tblTxBody.appendChild(tr);
+  });
+}
+
+/* ===== قائمة التركيب ===== */
+function refreshInstallList(){
+  const t = installType.value;
+  installPartSelect.innerHTML = `<option value="" disabled selected>— اختر قطعة متاحة —</option>`;
+  stock.filter(s=>s.qty>0 && (!t || s.type===t))
+       .forEach(s=>{
+         const serialTxt = s.serial && s.serial.trim() ? `SN:${s.serial}` : 'بدون سيريال';
+         const opt = document.createElement('option');
+         opt.value = s.id;
+         opt.textContent = `${s.type} • ${s.brand||'-'} ${s.model||''} • ${serialTxt} • متاح:${s.qty}`;
+         installPartSelect.appendChild(opt);
+       });
+}
+
+/* ===== الرسوم البيانية ===== */
+let chartStock, chartUsed;
+function sumQtyByType(arr, key){
+  const m={};
+  arr.forEach(x=>{
+    const k=x.type||'أخرى';
+    const v=Number(x[key]||0);
+    m[k]=(m[k]||0)+v;
+  });
+  return m;
+}
+function updateCharts(){
+  const cAvail = sumQtyByType(stock, 'qty');
+  const cUsed  = sumQtyByType(stock, 'qty_installed');
+  const labels = Array.from(new Set([...Object.keys(COLORS), ...Object.keys(cAvail), ...Object.keys(cUsed)]));
+  const dataAvail = labels.map(k=>cAvail[k]||0);
+  const dataUsed  = labels.map(k=>cUsed[k]||0);
+  const bg = labels.map(k=>COLORS[k]||'#999');
+
+  if(chartStock) chartStock.destroy();
+  chartStock = new Chart(document.getElementById('chartStock'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label:'متاح بالمخزون (Qty)', data:dataAvail, backgroundColor:bg }]},
+    options: { responsive:true, plugins:{ legend:{display:false}, tooltip:{rtl:true,textDirection:'rtl'} }, scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } } } }
+  });
+
+  if(chartUsed) chartUsed.destroy();
+  chartUsed = new Chart(document.getElementById('chartUsed'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ label:'مركّب (Qty)', data:dataUsed, backgroundColor:bg }]},
+    options: { responsive:true, plugins:{ legend:{ position:'bottom', rtl:true, labels:{usePointStyle:true} }, tooltip:{rtl:true,textDirection:'rtl'} }, cutout:'55%' }
+  });
+}
+
+/* ===== إضافة قطعة ===== */
+const formAddPart = document.getElementById('formAddPart');
+const photoInput  = document.getElementById('photo');
+const photoPreview= document.getElementById('photoPreview');
+
+photoInput.addEventListener('change', async (e)=>{
+  const f=e.target.files?.[0];
+  if(!f){ photoPreview.classList.add('d-none'); photoPreview.removeAttribute('src'); return; }
+  const url = await fileToDataURL(f);
+  photoPreview.src=url; photoPreview.classList.remove('d-none');
+});
+
+formAddPart.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  if(!formAddPart.checkValidity()){ formAddPart.classList.add('was-validated'); return; }
+  const file = photoInput.files?.[0];
+  const photoData = file ? await fileToDataURL(file) : '';
+
+  const qty = Math.max(1, parseInt(document.getElementById('qty').value || '1',10));
+  const serialVal = (document.getElementById('serial').value || '').trim();
+
+  if(serialVal && stock.some(s=> (s.serial||'').trim().toLowerCase() === serialVal.toLowerCase())){
+    alert('هذا السيريال موجود مسبقًا في المخزون.');
+    return;
+  }
+
+  const item = {
+    id: uid(),
+    type: document.getElementById('partType').value,
+    brand: document.getElementById('brand').value.trim(),
+    model: document.getElementById('model').value.trim(),
+    serial: serialVal,
+    notes: document.getElementById('notes').value.trim(),
+    photo: photoData,
+    qty: qty,
+    qty_installed: 0
+  };
+
+  stock.push(item); saveAll();
+  formAddPart.reset(); photoPreview.classList.add('d-none'); photoPreview.removeAttribute('src');
+  renderStock(document.getElementById('stockSearch').value);
+  refreshInstallList(); updateCharts();
+});
+
+/* ===== أزرار + / − و حذف ===== */
+document.querySelector('#tblStock tbody').addEventListener('click',(e)=>{
+  const btn = e.target.closest('button[data-action]'); if(!btn) return;
+  const id = btn.getAttribute('data-id'); const act= btn.getAttribute('data-action');
+  const it = stock.find(s=>s.id===id); if(!it) return;
+
+  if(act==='inc'){ it.qty = (it.qty||0) + 1; }
+  else if(act==='dec'){
+    if((it.qty||0)===0){ alert('لا يمكن أن تقل الكمية عن 0.'); return; }
+    it.qty = it.qty - 1;
+  }else if(act==='del'){
+    if((it.qty_installed||0)>0){
+      if(!confirm('تم تركيب بعض القطع من هذا السجل. حذف السجل سيُفقد التاريخ المرتبط به. هل تريد الحذف؟')) return;
+    }
+    stock = stock.filter(s=>s.id!==id);
+  }
+  saveAll();
+  renderStock(document.getElementById('stockSearch').value);
+  refreshInstallList(); updateCharts();
+});
+
+/* ===== تركيب قطعة على جهاز ===== */
+const formInstall = document.getElementById('formInstall');
+installType.addEventListener('change', refreshInstallList);
+
+formInstall.addEventListener('submit',(e)=>{
+  e.preventDefault();
+  if(!formInstall.checkValidity()){ formInstall.classList.add('was-validated'); return; }
+
+  const partId = installPartSelect.value;
+  const part = stock.find(s=>s.id===partId);
+  if(!part || (part.qty||0)<=0){ alert('اختر قطعة متاحة بكمية أكبر من 0.'); return; }
+
+  part.qty -= 1;
+  part.qty_installed = (part.qty_installed||0) + 1;
+
+  const rec = {
+    id: uid(),
+    date: document.getElementById('date').value || formatDateISO(new Date()),
+    sector: document.getElementById('sector').value.trim(),
+    department: document.getElementById('department').value.trim(),
+    floor: document.getElementById('floor').value.trim(),
+    employee: document.getElementById('employee').value.trim(),
+    deviceNo: document.getElementById('deviceNo').value.trim(),
+    deviceType: document.getElementById('deviceType').value,
+    technician: document.getElementById('technician').value.trim(),
+    partType: part.type,
+    partSerial: (part.serial||'').trim(),
+    details: `${part.brand||''} ${part.model||''}`.trim()
+  };
+  txLog.push(rec); saveAll();
+
+  formInstall.reset();
+  installPartSelect.innerHTML = `<option value="" disabled selected>— اختر قطعة متاحة —</option>`;
+
+  renderStock(document.getElementById('stockSearch').value);
+  renderTx(document.getElementById('txSearch').value);
+  updateCharts();
+});
+
+/* ===== بحث ===== */
+document.getElementById('stockSearch').addEventListener('input', e=> renderStock(e.target.value));
+document.getElementById('txSearch').addEventListener('input',    e=> renderTx(e.target.value));
+
+/* ===== زر حفظ البيانات (LocalStorage + Toast) ===== */
+document.getElementById('btnSaveNow').addEventListener('click', ()=>{
+  saveAll(); saveUI();
+  if (typeof updateCharts === 'function') updateCharts();
+  try{
+    const toastEl = document.getElementById('saveToast');
+    const toast = new bootstrap.Toast(toastEl, { delay: 2000 });
+    toast.show();
+  }catch(e){
+    alert('تم حفظ البيانات محليًا.');
+  }
+});
+
+/* ===== زر الطباعة ===== */
+document.getElementById('btnPrint').addEventListener('click', ()=> window.print());
+
+/* افتح السجل قبل الطباعة ثم ارجع للحالة السابقة بعد الطباعة (تحسين) */
+(function ensureTxOpenOnPrint(){
+  let wasCollapsed = false;
+  const txEl = document.getElementById('txSection');
+  window.addEventListener('beforeprint', ()=>{
+    wasCollapsed = !txEl.classList.contains('show');
+    if (wasCollapsed) txEl.classList.add('show');
+  });
+  window.addEventListener('afterprint', ()=>{
+    if (wasCollapsed) txEl.classList.remove('show');
+  });
+})();
+
+/* ===== مسح كل البيانات ===== */
+document.getElementById('btnClear').addEventListener('click', ()=>{
+  if(confirm('سيتم مسح كل البيانات المخزنة محليًا. هل أنت متأكد؟')){
+    stock=[]; txLog=[]; saveAll();
+    renderStock(); renderTx(); refreshInstallList(); updateCharts();
+  }
+});
+
+/* ===== منطق الإظهار/الإخفاء ===== */
+const stockCollapseEl = document.getElementById('stockSection');
+const txCollapseEl    = document.getElementById('txSection');
+const toggleStockBtn  = document.getElementById('toggleStockBtn');
+const toggleTxBtn     = document.getElementById('toggleTxBtn');
+
+function setToggleBtnText(){
+  const stockShown = stockCollapseEl.classList.contains('show');
+  const txShown    = txCollapseEl.classList.contains('show');
+  toggleStockBtn.innerHTML = stockShown
+    ? '<i class="bi bi-eye-slash me-1"></i> إخفاء المخزون الحالي'
+    : '<i class="bi bi-eye me-1"></i> إظهار المخزون الحالي';
+  toggleTxBtn.innerHTML = txShown
+    ? '<i class="bi bi-eye-slash me-1"></i> إخفاء سجل التركيبات'
+    : '<i class="bi bi-eye me-1"></i> إظهار سجل التركيبات';
+}
+function applyUIVisibility(){
+  if(uiState.stockVisible) stockCollapseEl.classList.add('show'); else stockCollapseEl.classList.remove('show');
+  if(uiState.txVisible)    txCollapseEl.classList.add('show');    else txCollapseEl.classList.remove('show');
+  setToggleBtnText();
+}
+['shown.bs.collapse','hidden.bs.collapse'].forEach(evt=>{
+  stockCollapseEl.addEventListener(evt, ()=>{ uiState.stockVisible = stockCollapseEl.classList.contains('show'); saveUI(); setToggleBtnText(); });
+  txCollapseEl.addEventListener(evt,    ()=>{ uiState.txVisible    = txCollapseEl.classList.contains('show');    saveUI(); setToggleBtnText(); });
+});
+
+/* ===== تهيئة ===== */
+(function init(){
+  applyUIVisibility();
+  document.getElementById('date').value = formatDateISO(new Date());
+  renderStock(); renderTx(); refreshInstallList(); updateCharts();
+})();
+</script>
+</body>
+</html>

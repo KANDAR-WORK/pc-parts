@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>الأجهزة والقطع المسكّرة — رسم مصغّر + ألوان قابلة للتخصيص + أعمدة</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    body{background:gray;font-family:'Cairo',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;}
+    .card{border:none;border-radius:18px;box-shadow:0 6px 20px rgba(0,0,0,.06)}
+    .sticky-actions{position:sticky;top:0;z-index:10;background:linear-gradient(#f6f7fb,#f6f7fbcc)}
+    .thumb{width:56px;height:56px;object-fit:cover;border-radius:10px;border:1px solid #eee}
+    .req::after{content:" *";color:#dc3545}
+    .searchbox{border-radius:12px}
+    .pill{display:inline-block;padding:.25rem .6rem;border-radius:999px;font-size:.8rem}
+    .pill-piece{background:#fdecea;color:#b02a37}
+    .pill-device{background:#e7f1ff;color:#0d6efd}
+    .mini-badge{font-size:.75rem}
+
+    /* الرسم المصغّر */
+    .chart-mini-wrap{display:flex;justify-content:center}
+    .chart-mini-card{max-width:420px;margin-inline:auto}
+    .chart-legend{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center}
+    .legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;vertical-align:middle;margin-inline-end:.35rem}
+    .chart-tab .btn{border-radius:999px}
+
+    /* جدول إعداد الألوان */
+    .color-row{display:grid;grid-template-columns:1fr 140px 40px;gap:.5rem;align-items:center}
+    .color-row input[type="text"]{height:38px}
+
+    @media print{
+      body *{visibility:hidden!important;}
+      #scrapSection, #scrapSection *{visibility:visible!important;}
+      #scrapSection{position:absolute!important;top:0;left:0;width:100%!important;}
+      #scrapSection.collapse{display:block!important;}
+      .card{box-shadow:none!important;border:1px solid #ccc!important;}
+      body{background:#fff!important;}
+      .table{page-break-inside:auto}
+      tr{page-break-inside:avoid;page-break-after:auto}
+    }
+  </style>
+</head>
+<body>
+<div class="container py-4">
+
+  <!-- شريط الأدوات -->
+  <div class="sticky-actions pb-2 mb-3">
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+      <a href="index.html" class="btn btn-secondary">
+        <i class="bi bi-arrow-right-circle me-1"></i> رجوع إلى النظام الرئيسي
+      </a>
+
+      <button id="btnSaveNow" class="btn btn-success">
+        <i class="bi bi-check2-circle me-1"></i> حفظ البيانات
+      </button>
+
+      <button id="btnPrint" class="btn btn-primary">
+        <i class="bi bi-printer me-1"></i> طباعة سجل المسكّرات
+      </button>
+
+      <a class="btn btn-outline-info" data-bs-toggle="collapse" href="#chartsWrap" role="button" aria-expanded="true" aria-controls="chartsWrap">
+        <i class="bi bi-pie-chart me-1"></i> إخفاء/إظهار الرسم المصغّر
+      </a>
+
+      <!-- زر إعداد الألوان -->
+      <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#colorsModal">
+        <i class="bi bi-palette me-1"></i> إعداد ألوان التصنيفات
+      </button>
+
+      <div class="vr mx-1"></div>
+      <button class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#formWrap" aria-expanded="true">
+        <i class="bi bi-sliders me-1"></i> إخفاء/إظهار نموذج الإدخال
+      </button>
+      <button class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#scrapSection" aria-expanded="true">
+        <i class="bi bi-eye-slash me-1"></i> إخفاء/إظهار السجل
+      </button>
+
+     
+    </div>
+  </div>
+
+  <!-- عنوان -->
+  <div class="card p-3 text-center mb-4">
+    <h4 class="fw-bold text-danger mb-0"><i class="bi bi-exclamation-triangle"></i> الأجهزة والقطع المسكّرة</h4>
+    <p class="text-muted mb-0">تسجيل وإدارة ما تم شطبه/تكهينه مع حفظ محلي</p>
+  </div>
+
+  <!-- الرسم المصغّر (دونات + أعمدة عبر تبويبات) -->
+  <div id="chartsWrap" class="collapse show">
+    <div class="chart-mini-wrap">
+      <div class="card p-3 chart-mini-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">التوزيع حسب التصنيف</h6>
+          <span class="mini-badge text-muted"><span id="totalByType">0</span> عنصر</span>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 chart-tab mb-2 justify-content-center">
+          <button id="tabDonut" class="btn btn-sm btn-outline-primary active"><i class="bi bi-record-circle"></i> دونات</button>
+          <button id="tabBar"   class="btn btn-sm btn-outline-primary"><i class="bi bi-bar-chart-steps"></i> أعمدة</button>
+        </div>
+
+        <div class="position-relative">
+          <canvas id="chartByTypeDonut" height="160"></canvas>
+          <canvas id="chartByTypeBar"   height="160" class="d-none"></canvas>
+        </div>
+
+        <div id="typeLegend" class="chart-legend mt-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- نموذج الإدخال -->
+  <div id="formWrap" class="collapse show">
+    <div class="card p-3 my-4">
+      <h5 class="mb-3">إضافة عنصر مسكّر</h5>
+      <form id="formScrap" class="needs-validation" novalidate>
+        <div class="row g-2">
+          <div class="col-md-3">
+            <label class="form-label req">نوع السجل</label>
+            <select id="scrapKind" class="form-select" required>
+              <option value="" disabled selected>اختر</option>
+              <option value="قطعة">قطعة</option>
+              <option value="جهاز">جهاز</option>
+            </select>
+            <div class="invalid-feedback">اختر نوع السجل.</div>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label req">التصنيف</label>
+            <select id="scrapType" class="form-select" required>
+              <option value="" disabled selected>اختر التصنيف</option>
+              <option>رام</option><option>SSD</option><option>فلاش</option><option>هارد</option>
+              <option>كرت شاشة</option><option>مزود طاقة</option><option>لوحة أم</option><option>معالج</option>
+              <option>كابل</option><option>شاشة</option>
+              <option>كمبيوتر مكتبي</option><option>لابتوب</option><option>All-in-One</option><option>طابعة</option><option>POS</option>
+              <option>أخرى</option>
+            </select>
+            <div class="invalid-feedback">اختر التصنيف.</div>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">الماركة</label>
+            <input id="brand" class="form-control" placeholder="مثال: HP / Samsung">
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">الموديل/السعة</label>
+            <input id="model" class="form-control" placeholder="مثال: 16GB / ProBook">
+          </div>
+        </div>
+
+        <div class="row g-2 mt-1">
+          <div class="col-md-3">
+            <label class="form-label">السيريال (اختياري)</label>
+            <input id="serial" class="form-control" placeholder="اختياري">
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label req">الحالة/السبب</label>
+            <select id="reason" class="form-select" required>
+              <option value="" disabled selected>اختر السبب</option>
+              <option>لا يعمل</option><option>مكسور</option><option>بدون قطع غيار</option>
+              <option>قديمة/غير مدعومة</option><option>مفقودة</option><option>أخرى</option>
+            </select>
+            <div class="invalid-feedback">أدخل السبب.</div>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">تاريخ</label>
+            <input type="date" id="date" class="form-control">
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">ملاحظات</label>
+            <input id="notes" class="form-control" placeholder="تفاصيل إضافية">
+          </div>
+        </div>
+
+        <div class="row g-2 mt-1">
+          <div class="col-md-3">
+            <label class="form-label">رقم الجهاز/الأصل (اختياري)</label>
+            <input id="deviceNo" class="form-control" placeholder="Asset/Tag No.">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">اسم الموظف (اختياري)</label>
+            <input id="employee" class="form-control" placeholder="اسم الموظف">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">صورة (اختياري)</label>
+            <input type="file" id="photo" class="form-control" accept="image/*">
+            <img id="photoPreview" class="thumb mt-2 d-none" alt="preview">
+          </div>
+        </div>
+
+        <div class="d-grid mt-3">
+          <button class="btn btn-danger"><i class="bi bi-x-octagon me-1"></i> إضافة إلى المسكّرات</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- السجل + البحث -->
+  <div class="collapse show" id="scrapSection">
+    <div class="card p-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">سجل القطع والأجهزة المسكّرة</h5>
+        <div class="input-group w-auto">
+          <span class="input-group-text bg-white border-0"><i class="bi bi-search"></i></span>
+          <input id="qSearch" class="form-control searchbox" placeholder="بحث (نوع/تصنيف/ماركة/موديل/سيريال/سبب/موظف/رقم)">
+        </div>
+      </div>
+
+      <div class="table-responsive mt-3">
+        <table class="table align-middle" id="tblScrap">
+          <thead class="table-light">
+            <tr>
+              <th>الصورة</th><th>النوع</th><th>التصنيف</th><th>الماركة</th><th>الموديل/السعة</th>
+              <th>السيريال</th><th>السبب</th><th>التاريخ</th><th>رقم الجهاز</th><th>اسم الموظف</th><th>ملاحظات</th><th>حذف</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal إعداد الألوان -->
+<div class="modal fade" id="colorsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-palette me-1"></i> إعداد ألوان التصنيفات</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+      </div>
+      <div class="modal-body">
+        <div id="colorsList" class="vstack gap-2"></div>
+        <hr class="my-3">
+        <div class="color-row">
+          <input id="newType" type="text" class="form-control" placeholder="اسم تصنيف جديد (مثال: بطاقة صوت)">
+          <input id="newColor" type="color" class="form-control form-control-color" value="#888888" title="اختر لونًا">
+          <button id="btnAddType" class="btn btn-outline-primary"><i class="bi bi-plus-lg"></i></button>
+        </div>
+      </div>
+      <div class="modal-footer justify-content-between">
+        <button id="btnResetColors" class="btn btn-outline-danger">
+          <i class="bi bi-arrow-counterclockwise me-1"></i> استعادة الألوان الافتراضية
+        </button>
+        <div class="d-flex gap-2">
+          <button id="btnSaveColors" class="btn btn-success">
+            <i class="bi bi-check2-circle me-1"></i> حفظ
+          </button>
+          <button class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast حفظ -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:1080">
+  <div id="saveToast" class="toast align-items-center text-bg-success border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body">✅ تم حفظ البيانات محليًا.</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+/* ===== مفاتيح التخزين ===== */
+const LS_SCRAP   = 'pc_parts_scrapped_v6_bar_and_donut';
+const LS_COLORS  = 'pc_parts_scrapped_colors_map_v1';
+let scrap  = JSON.parse(localStorage.getItem(LS_SCRAP)  || '[]');
+let C_MAP  = JSON.parse(localStorage.getItem(LS_COLORS) || 'null');
+
+/* ===== ألوان افتراضية ===== */
+const DEFAULT_COLORS = {
+  'فلاش':'#dc3545','رام':'#0d6efd','هارد':'#198754','SSD':'#6f42c1','كرت شاشة':'#fd7e14',
+  'مزود طاقة':'#20c997','لوحة أم':'#6c757d','معالج':'#6610f2','كابل':'#0dcaf0','شاشة':'#ffc107',
+  'كمبيوتر مكتبي':'#795548','لابتوب':'#17a2b8','All-in-One':'#8e44ad','طابعة':'#2ecc71','POS':'#e67e22',
+  'أخرى':'#adb5bd'
+};
+function ensureColors(){ if(!C_MAP || typeof C_MAP!=='object') C_MAP = {...DEFAULT_COLORS}; }
+ensureColors();
+
+/* ===== أدوات عامة ===== */
+function uid(){ return 'id_' + Math.random().toString(36).slice(2,10); }
+function fileToDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); }); }
+function todayISO(){ const d=new Date(); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }
+function saveAll(){ localStorage.setItem(LS_SCRAP, JSON.stringify(scrap)); }
+function saveColors(){ localStorage.setItem(LS_COLORS, JSON.stringify(C_MAP)); }
+function colorForType(label){ const k=(label&&String(label).trim())?String(label).trim():'أخرى'; return C_MAP[k] || C_MAP['أخرى'] || '#999'; }
+
+/* ===== DOM ===== */
+const tblBody = document.querySelector('#tblScrap tbody');
+
+/* ===== جدول السجل ===== */
+function renderTable(filter=''){
+  const q = filter.trim().toLowerCase();
+  tblBody.innerHTML='';
+  scrap.forEach((x)=>{
+    const hay = [x.kind,x.type,x.brand,x.model,x.serial||'',x.reason,x.date,x.deviceNo||'',x.employee||'',x.notes||''].join(' ').toLowerCase();
+    if(q && !hay.includes(q)) return;
+    const serialTxt = x.serial && x.serial.trim() ? x.serial : '—';
+    const badge = x.kind==='قطعة' ? '<span class="pill pill-piece">قطعة</span>' : '<span class="pill pill-device">جهاز</span>';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${x.photo?`<img src="${x.photo}" class="thumb" alt="">`:'—'}</td>
+      <td>${badge}</td>
+      <td>${x.type||''}</td>
+      <td>${x.brand||''}</td>
+      <td>${x.model||''}</td>
+      <td><code>${serialTxt}</code></td>
+      <td>${x.reason||''}</td>
+      <td>${x.date||''}</td>
+      <td>${x.deviceNo||''}</td>
+      <td>${x.employee||''}</td>
+      <td>${x.notes||''}</td>
+      <td><button class="btn btn-sm btn-outline-danger" data-action="del" data-id="${x.id}"><i class="bi bi-x-lg"></i></button></td>`;
+    tblBody.appendChild(tr);
+  });
+}
+
+/* ===== تجميع البيانات + ترتيب تنازلي ===== */
+function countBySorted(arr, key){
+  const m = new Map();
+  arr.forEach(o=>{
+    const k = (o[key] && String(o[key]).trim()) ? String(o[key]).trim() : 'أخرى';
+    m.set(k, (m.get(k)||0)+1);
+  });
+  const entries = Array.from(m.entries()).sort((a,b)=> b[1]-a[1]);
+  return { labels: entries.map(e=>e[0]), data: entries.map(e=>e[1]) };
+}
+
+/* ===== الرسوم: دونات + أعمدة ===== */
+let chartDonut, chartBar;
+
+function buildLegend(labels){
+  const legend = document.getElementById('typeLegend');
+  legend.innerHTML = '';
+  labels.forEach(l=>{
+    const span = document.createElement('span');
+    span.innerHTML = `<span class="legend-dot" style="background:${colorForType(l)}"></span>${l}`;
+    legend.appendChild(span);
+  });
+}
+
+function updateCharts(){
+  const byType = countBySorted(scrap,'type');
+  document.getElementById('totalByType').textContent = (scrap.length).toString();
+
+  // Donut
+  if(chartDonut) chartDonut.destroy();
+  chartDonut = new Chart(document.getElementById('chartByTypeDonut'), {
+    type:'doughnut',
+    data:{ labels: byType.labels, datasets:[{ data: byType.data, backgroundColor: byType.labels.map(l=>colorForType(l)) }] },
+    options:{ responsive:true, plugins:{ legend:{display:false}, tooltip:{ rtl:true, textDirection:'rtl' } }, cutout:'58%' }
+  });
+
+  // Bar (أعمدة) — مصغّر ومرتب تنازليًا، ألوان حسب التصنيف
+  if(chartBar) chartBar.destroy();
+  chartBar = new Chart(document.getElementById('chartByTypeBar'), {
+    type:'bar',
+    data:{
+      labels: byType.labels,
+      datasets:[{
+        label:'عدد العناصر',
+        data: byType.data,
+        backgroundColor: byType.labels.map(l=> colorForType(l)),
+        borderWidth: 0
+      }]
+    },
+    options:{
+      responsive:true,
+      plugins:{ legend:{display:false}, tooltip:{ rtl:true, textDirection:'rtl' } },
+      scales:{
+        y:{ beginAtZero:true, ticks:{ precision:0 } },
+        x:{ ticks:{ autoSkip:true, maxRotation:0, minRotation:0 } }
+      }
+    }
+  });
+
+  buildLegend(byType.labels);
+}
+
+/* ===== تبويبات الرسم (دونات/أعمدة) ===== */
+const tabDonutBtn = document.getElementById('tabDonut');
+const tabBarBtn   = document.getElementById('tabBar');
+const canvasDonut = document.getElementById('chartByTypeDonut');
+const canvasBar   = document.getElementById('chartByTypeBar');
+
+function activateTab(which){
+  if(which==='donut'){
+    canvasDonut.classList.remove('d-none');
+    canvasBar.classList.add('d-none');
+    tabDonutBtn.classList.add('active');
+    tabBarBtn.classList.remove('active');
+    if(chartDonut) chartDonut.resize();
+  }else{
+    canvasDonut.classList.add('d-none');
+    canvasBar.classList.remove('d-none');
+    tabBarBtn.classList.add('active');
+    tabDonutBtn.classList.remove('active');
+    if(chartBar) chartBar.resize();
+  }
+}
+tabDonutBtn.addEventListener('click', ()=> activateTab('donut'));
+tabBarBtn.addEventListener('click',   ()=> activateTab('bar'));
+
+/* ===== إعداد الألوان (Modal) ===== */
+const colorsList = document.getElementById('colorsList');
+const newTypeInp = document.getElementById('newType');
+const newColorInp= document.getElementById('newColor');
+
+function renderColorsEditor(){
+  colorsList.innerHTML = '';
+  const entries = Object.entries(C_MAP).sort((a,b)=> a[0].localeCompare(b[0],'ar'));
+  entries.forEach(([name, color])=>{
+    const row = document.createElement('div');
+    row.className = 'color-row';
+    row.innerHTML = `
+      <input type="text" class="form-control type-name" value="${name}">
+      <input type="color" class="form-control form-control-color type-color" value="${color}">
+      <button class="btn btn-outline-danger btn-sm del-btn" title="حذف"><i class="bi bi-trash"></i></button>
+    `;
+    if (['أخرى'].includes(name)) {
+      row.querySelector('.del-btn').disabled = true;
+      row.querySelector('.type-name').readOnly = true;
+    }
+    colorsList.appendChild(row);
+  });
+}
+document.getElementById('btnAddType').addEventListener('click', ()=>{
+  const t = (newTypeInp.value || '').trim();
+  const c = (newColorInp.value || '').trim();
+  if(!t){ alert('اكتب اسم التصنيف.'); return; }
+  C_MAP[t] = c || '#888888';
+  newTypeInp.value = '';
+  renderColorsEditor();
+});
+document.getElementById('colorsModal').addEventListener('shown.bs.modal', renderColorsEditor);
+colorsList.addEventListener('click', (e)=>{
+  const btn = e.target.closest('.del-btn'); if(!btn) return;
+  const row = btn.closest('.color-row');
+  const name = row.querySelector('.type-name').value.trim();
+  if (confirm(`حذف اللون المخصص للتصنيف: "${name}"؟`)) {
+    delete C_MAP[name];
+    renderColorsEditor();
+  }
+});
+document.getElementById('btnSaveColors').addEventListener('click', ()=>{
+  const rows = colorsList.querySelectorAll('.color-row');
+  const updated = {};
+  rows.forEach(r=>{
+    const name  = r.querySelector('.type-name').value.trim();
+    const color = r.querySelector('.type-color').value.trim();
+    if(name) updated[name] = color || '#888888';
+  });
+  if(!updated['أخرى']) updated['أخرى'] = C_MAP['أخرى'] || '#adb5bd';
+  C_MAP = updated;
+  saveColors();
+  updateCharts(); // تحديث الدونات والأعمدة والأسطورة
+  const modalEl = document.getElementById('colorsModal');
+  const modal   = bootstrap.Modal.getInstance(modalEl);
+  modal.hide();
+});
+document.getElementById('btnResetColors').addEventListener('click', ()=>{
+  if(confirm('هل تريد استعادة الألوان الافتراضية؟')){
+    C_MAP = {...DEFAULT_COLORS};
+    saveColors();
+    renderColorsEditor();
+    updateCharts();
+  }
+});
+
+/* ===== صورة المعاينة ===== */
+const photoInput = document.getElementById('photo');
+const photoPreview = document.getElementById('photoPreview');
+photoInput.addEventListener('change', async (e)=>{
+  const f = e.target.files?.[0];
+  if(!f){ photoPreview.classList.add('d-none'); photoPreview.removeAttribute('src'); return; }
+  const url = await fileToDataURL(f);
+  photoPreview.src=url; photoPreview.classList.remove('d-none');
+});
+
+/* ===== إضافة عنصر ===== */
+const form = document.getElementById('formScrap');
+form.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  if(!form.checkValidity()){ form.classList.add('was-validated'); return; }
+  const f = {
+    id: uid(),
+    kind: document.getElementById('scrapKind').value,
+    type: document.getElementById('scrapType').value,
+    brand: document.getElementById('brand').value.trim(),
+    model: document.getElementById('model').value.trim(),
+    serial: document.getElementById('serial').value.trim(),
+    reason: document.getElementById('reason').value,
+    date: document.getElementById('date').value || todayISO(),
+    notes: document.getElementById('notes').value.trim(),
+    deviceNo: document.getElementById('deviceNo').value.trim(),
+    employee: document.getElementById('employee').value.trim(),
+    photo: photoPreview?.src || ''
+  };
+  scrap.push(f); saveAll();
+  form.reset(); photoPreview.classList.add('d-none'); photoPreview.removeAttribute('src');
+  renderTable(document.getElementById('qSearch').value);
+  updateCharts();
+});
+
+/* ===== حذف صف ===== */
+document.querySelector('#tblScrap tbody').addEventListener('click',(e)=>{
+  const btn = e.target.closest('button[data-action="del"]'); if(!btn) return;
+  const id = btn.getAttribute('data-id');
+  if(confirm('حذف هذا السجل؟')){
+    scrap = scrap.filter(x=>x.id!==id); saveAll();
+    renderTable(document.getElementById('qSearch').value);
+    updateCharts();
+  }
+});
+
+/* ===== بحث حي ===== */
+document.getElementById('qSearch').addEventListener('input', e=>{
+  renderTable(e.target.value);
+  // الرسوم تعكس التوزيع الكُلّي (ليست نتائج البحث)
+});
+
+/* ===== حفظ + Toast ===== */
+document.getElementById('btnSaveNow').addEventListener('click', ()=>{
+  saveAll(); saveColors();
+  try{
+    const toastEl = document.getElementById('saveToast');
+    new bootstrap.Toast(toastEl, { delay: 1800 }).show();
+  }catch{ alert('تم الحفظ محليًا.'); }
+});
+
+/* ===== طباعة السجل فقط ===== */
+document.getElementById('btnPrint').addEventListener('click', ()=> window.print());
+
+/* ===== مسح الكل ===== */
+document.getElementById('btnClear').addEventListener('click', ()=>{
+  if(confirm('سيتم مسح كل سجلات المسكّرات من التخزين المحلي. هل أنت متأكد؟')){
+    scrap=[]; saveAll(); renderTable(); updateCharts();
+  }
+});
+
+/* ===== تهيئة ===== */
+(function init(){
+  document.getElementById('date').value = todayISO();
+  renderTable();
+  updateCharts();
+  activateTab('donut'); // افتراضيًا إظهار الدونات
+})();
+</script>
+</body>
+</html>
